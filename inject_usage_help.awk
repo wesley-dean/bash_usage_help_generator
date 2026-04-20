@@ -25,7 +25,7 @@ function load_help_text(    line) {
 function print_generated_block(    i) {
   print "## @cond GENERATED_USAGE_HELP"
   print "usage_help() {"
-  print "  cat <<'\''__BASHLIB_USAGE_HELP__'\''"
+  print "  cat <<'__BASHLIB_USAGE_HELP__'"
   for (i = 1; i <= help_count; i++) {
     print help_lines[i]
   }
@@ -57,9 +57,6 @@ END {
     exit 0
   }
 
-  #
-  # If a generated block already exists, replace it in place.
-  #
   if (found_generated_block) {
     for (i = 1; i <= line_count; i++) {
       if (!in_generated_block &&
@@ -85,9 +82,6 @@ END {
     exit 0
   }
 
-  #
-  # Otherwise inject after shebang, or at top if no shebang exists.
-  #
   if (lines[1] ~ /^#!/) {
     print lines[1]
     print_generated_block()

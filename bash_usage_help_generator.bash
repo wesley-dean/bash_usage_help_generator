@@ -18,13 +18,53 @@ main() {
 
   if [ "$#" -eq 0 ] ; then
     printf "Usage: %s FILE.src.bash [MORE.src.bash ...]\n" "$(basename "$0")" >&2
+    printf "       %s - < input.src.bash > output.bash\n" "$(basename "$0")" >&2
     return 1
   fi
+
+  if [ "$#" -eq 1 ] && [ "$1" = "-" ] ; then
+    run_stdin_mode "${makefile}"
+    return $?
+  fi
+
+  run_file_mode "${makefile}" "$@"
+}
+
+run_stdin_mode() {
+  local makefile="${1?Error: no Makefile provided}"
+  local temp_dir
+
+  temp_dir="$(mktemp -d)" || return 1
+
+  cleanup_stdin_mode() {
+    rm -rf -- "${temp_dir}"
+  }
+
+  trap cleanup_stdin_mode EXIT HUP INT TERM
+
+  cat > "${temp_dir}/stdin.src.bash"
+
+  (
+    cd -- "${temp_dir}"
+    make -f "${makefile}" FILES="stdin.src.bash"
+  ) >/dev/null
+
+  cat "${temp_dir}/stdin.bash"
+
+  trap - EXIT HUP INT TERM
+  cleanup_stdin_mode
+}
+
+run_file_mode() {
+  local makefile="${1?Error: no Makefile provided}"
+  shift
 
   local arg
   local abs_path
   local dir
   local base
+  local build_dir
+  local stem
 
   local -a ordered_dirs=()
   local -A seen_dirs=()
@@ -65,9 +105,6 @@ main() {
     fi
   done
 
-  local build_dir
-  local stem
-
   for dir in "${ordered_dirs[@]}" ; do
     (
       cd -- "$dir"
@@ -77,7 +114,7 @@ main() {
     for base in ${files_by_dir[$dir]} ; do
       stem="${base%.src.bash}"
       build_dir="${dir}/build"
-      printf "%s\n" "${build_dir}/${stem}.bash"
+      printf "%s\n" "${dir}/${stem}.bash"
     done
   done
 }
