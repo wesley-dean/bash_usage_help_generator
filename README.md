@@ -1,88 +1,226 @@
-# template
+# Bash Usage Help Generator
 
-## Description
+Generate clean, self-contained usage help for Bash scripts from
+structured comments.
 
-This is a template for a README.md file. It is a markdown file that is used to
-describe a project. It is used to provide information about the project to the
-users and contributors. It is a good practice to have a README.md file in your
-project repository.
+This tool extracts Doxygen-style comments from a `.src.bash` file,
+converts them into Markdown, and injects the rendered help directly into
+a minified `.bash` script.
 
+The result is a compact, production-ready script that still provides
+rich, readable usage help at runtime.
+
+------------------------------------------------------------------------
+
+## Quick Start
+
+``` bash
+# Create a source script
+cat > example.src.bash <<'EOF'
+#!/usr/bin/env bash
+
+## @file example.src.bash
+## @brief Example CLI tool
+## @details
+## Demonstrates usage help generation.
+##
+while getopts "h" option ; do
+  case "$option" in
+    h) usage_help ; exit 0 ;; ##- display usage help
+  esac
+done
+
+printf 'Hello, world\n'
+EOF
+
+# Run the tool
+bash_usage_help_generator.bash example.src.bash
+
+# Run the generated script
+./example.bash -h
+```
+
+------------------------------------------------------------------------
+
+## Installation
+
+### Manual Installation
+
+``` bash
+git clone https://github.com/wesley-dean/bash_usage_help_generator.git
+cd bash_usage_help_generator
+
+chmod +x bash_usage_help_generator.bash
+
+# Optional
+cp bash_usage_help_generator.bash ~/bin/
+```
+
+Usage:
+
+``` bash
+bash_usage_help_generator.bash /path/to/script.src.bash
+```
+
+------------------------------------------------------------------------
+
+### Docker-Based Installation
+
+Assumes the image:
+
+    wesleydean/bash_usage_help_generator:latest
+
+#### File-based usage
+
+``` bash
+docker run --rm \
+  -v "$PWD:/work" \
+  wesleydean/bash_usage_help_generator:latest \
+  /work/example.src.bash
+```
+
+#### STDIN / STDOUT usage
+
+``` bash
+cat example.src.bash | \
+docker run --rm -i \
+  wesleydean/bash_usage_help_generator:latest \
+  - > example.bash
+```
+
+------------------------------------------------------------------------
+
+## Writing Extractable Comments
+
+The tool parses Doxygen-style comments that begin with `##`.
+
+### Supported tags
+
+-   `@file` → top-level title
+-   `@fn` → function title
+-   `@brief` → short description
+-   `@details` → longer description
+-   `@param` → grouped under "Parameters"
+-   `@retval` → grouped under "Return values"
+-   `@return` → grouped under "Returns"
+-   `@par` → section header
+-   `@code` / `@endcode` → fenced code block
+-   `##-` → inline option descriptions
+
+### Example
+
+``` bash
+## @fn example()
+## @brief Example function
+## @param name the name to use
+## @retval 0 success
+## @retval 1 failure
+```
+
+### Options extraction
+
+``` bash
+h) usage_help ;; ##- display usage help
+'--help') usage_help ;; ##- display usage help
+```
+
+Produces:
+
+``` markdown
+## Options
+
+* `-h`: display usage help
+* `--help`: display usage help
+```
+
+------------------------------------------------------------------------
+
+## Full Example
+
+### Input: `example.src.bash`
+
+``` bash
+#!/usr/bin/env bash
+
+## @file example.src.bash
+## @brief Example CLI tool
+## @details
+## This script demonstrates usage help generation.
+##
+while getopts "h" option ; do
+  case "$option" in
+    h) usage_help ; exit 0 ;; ##- display usage help
+  esac
+done
+
+printf 'Hello\n'
+```
+
+### Run
+
+``` bash
+bash_usage_help_generator.bash example.src.bash
+```
+
+### Output: `example.bash` (excerpt)
+
+``` bash
+usage_help() {
+  cat <<'__BASHLIB_USAGE_HELP__'
 ## Usage
 
-You can use this template to create a README.md file for your project. You can
+`example.src.bash` [-h]
 
-- Clone this repository
-- Copy the README.md file to your project repository
-- Edit the file to add information about your project
+# file example.src.bash
 
-### Environment Variables
+## Brief
 
-There are three environment variables that need to be set for this project to
-work correctly:
+Example CLI tool
 
-- `PAT` - Your GitHub Personal Access Token
-- `GPG_PRIVATE_KEY` - Your GPG Private Key
-- `GPG_PRIVATE_KEY_PASSPHRASE` - Your GPG Private Key Passphrase
+## Details
 
-The `PAT` environment variable is used by MegaLinter to authenticate with the
-GitHub API. The `GPG_PRIVATE_KEY` and `GPG_PRIVATE_KEY_PASSPHRASE` environment
-variables are used to sign the commits that MegaLinter creates when
-`APPLY_FIXES` is set to `true`.
+This script demonstrates usage help generation.
 
-If the MegaLinter action is disabled, none of these environment variables are
-required.
+## Options
 
-### Conventional Commits
+* `-h`: display usage help
+__BASHLIB_USAGE_HELP__
+}
+```
 
-This project uses Conventional Commits. Conventional Commits is a specification
-for adding human and machine readable meaning to commit messages. It is a
-lightweight convention on top of commit messages. The specification can be
-found at [conventionalcommits.org](https://www.conventionalcommits.org/).
+### Runtime
 
-Specifically, this project uses the
-[bitshifted/git-auto-semver](https://github.com/bitshifted/git-auto-semver)
-action to automatically increment the version number based on the commit
-messages:
+``` bash
+./example.bash -h
+```
 
+------------------------------------------------------------------------
 
-- `build`, `chore`, `ci`, `docs`, `fix`, `perf`, `refactor`, `revert`,
-  `style`, `test`: bump micro (patch) number
-- `feat`: bump minor version number
-- `BREAKING CHANGE`: bump major version number
+## How It Works
 
-## Documentation
+1.  Extract Doxygen-style comments using `awk`
+2.  Convert to Markdown
+3.  Minify the script using `Bash-minifier`
+4.  Inject a generated `usage_help()` function
+5.  Output:
+    -   `build/*.bash` (intermediate)
+    -   `./script.bash` (final)
 
-### Architecture Decision Records (ADRs)
+------------------------------------------------------------------------
 
-This project is configured to use [Nat Pryce's](https://github.com/npryce)
-[adr-tools](https://github.com/npryce/adr-tools) project.  There is a template
-at `doc/adrs/templates/template.md` which can be edited at-will.  The ADR
-template is built to support both human and machine (AI/LLM)-produced and
-maintained ADRs.  The configuration file, `.adr-dir` resides at the root of
-the project and may be updated if ADRs are to be stored in an alternate
-directory.
+## Testing
 
-For more information about ADRs, check out
-[Michael Nygard](https://cognitect.com/authors/MichaelNygard.html)'s
-[article](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
-on the topic.
+Run the full test suite with:
 
-## License
+``` bash
+make test
+```
 
-This project is licensed under the Creative Commons License 1.0 Universal
-License - see the [LICENSE](LICENSE) file for details.
+------------------------------------------------------------------------
 
-## Contributing
+## Acknowledgments
 
-Contributions are welcome. Please read the [CONTRIBUTING.md](CONTRIBUTING.md)
-file for details.
+This project uses:
 
-### Code of Conduct
-
-Please read the [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) file for details on
-the code of conduct.  Long story short, be nice to each other and treat each
-other with respect, compassion, and empathy, especially when you disagree.
-
-## Authors
-
-- Wes Dean
+-   Bash Minifier by Love Borgström (Zuzzuc)\
+    https://github.com/Zuzzuc/Bash-minifier
